@@ -1,0 +1,61 @@
+## 1: 创建队列管理器
+crtmqm QMTEST1
+
+## 2: 启动队列管理器
+strmqm QMTEST1
+
+## 3: 运行队列管理器控制台
+runmqsc QMTEST1
+
+*#######根据实际需要修改队列管理器的CCSID,一般为1386(GBK),1381(GB2312),1208(UTF-8)
+ALTER QMGR CCSID(1386)
+
+*#######为队列管理器创建死信队列QMTEST1.DEAD.QUEUE,这步一般可以不需要
+ALTER QMGR DEADQ(QMTEST1.DEAD.QUEUE) FORCE
+DEFINE QLOCAL(QMTEST1.DEAD.QUEUE) MAXDEPTH(999999999) DEFPSIST(YES) REPLACE
+
+*####### 4: 创建本地队列 QMTEST1.QL1
+define qlocal(QMTEST1.QL1)
+
+*####### 5: 创建传输队列 QMTEST1.QT1
+define qlocal(QMTEST1.QT1) usage(xmitq) trigger trigtype(first) initq(system.channel.initq) trigdata(QMTEST1.QMTEST2)
+
+*####### 6,定义运程队列 QMTEST1.QR1(本地传输队列为QMTEST1.QT1,远程队列管理器为QMTEST2,远程队列为QMTEST2.QL1)
+define qremote(QMTEST1.QR1) rname(QMTEST2.QL1) rqmname(QMTEST2) xmitq(QMTEST1.QT1)
+
+*####### 7,定义发送端通道QMTEST1.QMTEST2,指定对方地址localhost(9902) 7788为侦听端口
+define channel(QMTEST1.QMTEST2) chltype(sdr) conname('localhost(9902)') xmitq(QMTEST1.QT1) trptype(tcp)
+
+*####### 8,定义接受方通道QM2.QM1:
+define channel(QMTEST2.QMTEST1) chltype(rcvr) trptype(tcp)
+
+*#######启动发送方通道
+START CHANNEL(QMTEST1.QMTEST2)
+
+*#######查看发送方通道状态
+DISPLAY CHSTATUS(QMTEST1.QMTEST2)
+
+*####### 9,定义侦听QMTEST1.LSR1, control(qmgr) 参数指定是队列管理器默认侦听
+def listener(QMTEST1.LSR1) trptype(tcp) port(9901) control(qmgr)
+
+*####### 10,启动侦听：
+start listener(system.default.listener.tcp)
+
+
+*#######修改服务器通道,以便接受Java请求
+*# ALTER CHANNEL(SYSTEM.DEF.SVRCONN) CHLTYPE(SVRCONN) MCAUSER('')
+
+*#######创建侦听器(端口根据实际环境自行修改)
+*#DEFINE LISTENER ('MQTEST.LSR.REQ') TRPTYPE(TCP) PORT(78183) BACKLOG(0) CONTROL(QMGR) REPLACE
+
+*#######启动侦听器
+*#START LISTENER ('MQTEST.LSR.REQ')
+
+*#######为服务创建本地侦听队列：实际上 4: 创建本地队列 QMTEST1.QL1 即可
+*#DEFINE QLOCAL(LOCALQ.MQTEST.REQ) REPLACE
+
+END
+
+endmqm -i QMTEST1
+strmqm QMTEST1
+
